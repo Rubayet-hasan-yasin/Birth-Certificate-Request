@@ -16,6 +16,8 @@ namespace Birth_Certificate_Request.Controllers
 
             if(Base64.IsValid(data.ImageData))
             {
+                
+
                 return Ok(true);
             }
             
