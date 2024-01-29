@@ -1,9 +1,11 @@
 ﻿using Birth_Certificate_Request.Models;
 using Birth_Certificate_Request.Models.DTO;
+using Microsoft.AspNetCore.Connections;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using MySqlConnector;
 using System.Buffers.Text;
+using System.Data;
 
 namespace Birth_Certificate_Request.Controllers
 {
@@ -11,50 +13,67 @@ namespace Birth_Certificate_Request.Controllers
     [ApiController]
     public class BirthCertificateController : ControllerBase
     {
-
-        [HttpGet]
-        public ActionResult GetCertificateData([FromQuery] long BRNumber)
+        [NonAction]
+        public MySqlConnection MysqlDBConnection()
         {
-            //Console.WriteLine(BRNumber);
-
-            
-
-
             var builder = new MySqlConnectionStringBuilder
             {
-                Server = "localhost",
-                Database = "BirthCertificate",
-                UserID = "root",
-                Password = "password1234",
+                Server = "sql6.freemysqlhosting.net",
+                Database = "sql6679380",
+                UserID = "sql6679380",
+                Password = "dQfg6iDbqu",
                 SslMode = MySqlSslMode.None
             };
 
             var connection = new MySqlConnection(builder.ConnectionString);
+            return connection;
+        }
 
-            
+
+
+
+
+        [HttpGet]
+        public ActionResult GetCertificateData([FromQuery] long BRNumber)
+        {
+
+            var connection = MysqlDBConnection();
+
+
+
 
             connection.Open();
             var command = connection.CreateCommand();
-            command.CommandText = $"SELECT * FROM birthdata WHERE BRNumber = {BRNumber}";
+            //command.CommandText = $"SELECT * FROM birthdata WHERE BRNumber = {BRNumber}";
+            command.CommandType = CommandType.StoredProcedure;
+            command.CommandText = "BRCDataGet";
+
+            command.Parameters.AddWithValue("@BRNumber", BRNumber);
 
             command.ExecuteNonQuery();
 
             var reader = command.ExecuteReader();
 
-            BirthCertificateDTO data = new BirthCertificateDTO();
+            //List<BirthCertificateDTO> dataList =new List<BirthCertificateDTO>();
+
+            //BirthCertificateDTO data = new BirthCertificateDTO();
+
+            //var dataList = typeof(BirthCertificateDTO).GetProperties().Select(p=> p.Name).ToList();
+
+
+            string[] data = { };
 
             while (reader.Read())
             {
+                //BirthCertificateDTO data = new BirthCertificateDTO();
+
                 int count = reader.FieldCount;
 
                 
-
                 for(int i = 0; i<count; i++)
                 {
-
                     var value = reader.GetValue(i);
-
-                    Console.WriteLine(value);
+                    data.Append(value);
 
                     //data[i] = value;
                     
@@ -73,22 +92,20 @@ namespace Birth_Certificate_Request.Controllers
         public async void PostBirthCertificate([FromBody] BirthCertificate data)
         {
 
-            var builder = new MySqlConnectionStringBuilder
-            {
-                Server = "localhost",
-                Database= "BirthCertificate",
-                UserID= "root",
-                Password= "password1234",
-                SslMode = MySqlSslMode.None
-            };
+           
 
 
-            var connection = new MySqlConnection(builder.ConnectionString);
+            var connection = MysqlDBConnection();
 
             await connection.OpenAsync();
 
+
+
             // create a DB command and set the SQL
             var command = connection.CreateCommand();
+
+
+            /*
             command.CommandText = "CREATE TABLE IF NOT EXISTS BirthData(" +
                 "RegisterNo INT NOT NULL," +
                 "DateOfIssue DATE,"+
@@ -131,6 +148,22 @@ namespace Birth_Certificate_Request.Controllers
             command.Parameters.AddWithValue("MotherNIDNumber", data.MotherNIDNumber);
             command.Parameters.AddWithValue("MotherNationality", data.MotherNationality);
             
+            */
+
+
+            command.CommandType = CommandType.StoredProcedure;
+
+            command.CommandText = "BRCDataInsert";
+
+            foreach (var property in typeof(BirthCertificate).GetProperties())
+            {
+                //Console.WriteLine(property.Name);
+                //Console.WriteLine(property.GetValue(data));
+
+                command.Parameters.AddWithValue("@"+ property.Name, property.GetValue(data));
+
+            }
+
 
 
             int result = await command.ExecuteNonQueryAsync();
