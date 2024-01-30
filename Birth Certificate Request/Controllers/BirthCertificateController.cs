@@ -1,5 +1,6 @@
 ﻿using Birth_Certificate_Request.Models;
 using Birth_Certificate_Request.Models.DTO;
+using Birth_Certificate_Request.Models.Response;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -16,14 +17,25 @@ namespace Birth_Certificate_Request.Controllers
         [NonAction]
         public MySqlConnection MysqlDBConnection()
         {
+            //var builder = new MySqlConnectionStringBuilder
+            //{
+            //    Server = "sql6.freemysqlhosting.net",
+            //    Database = "sql6679380",
+            //    UserID = "sql6679380",
+            //    Password = "dQfg6iDbqu",
+            //    SslMode = MySqlSslMode.None
+            //};
+
             var builder = new MySqlConnectionStringBuilder
             {
-                Server = "sql6.freemysqlhosting.net",
-                Database = "sql6679380",
-                UserID = "sql6679380",
-                Password = "dQfg6iDbqu",
-                SslMode = MySqlSslMode.None
+                Server = "mysql-361cb314-yasinarafat12346-f563.a.aivencloud.com",
+                Database = "defaultdb",
+                UserID = "avnadmin",
+                Password = "AVNS_GRZzi6LVsHD21VTzoog",
+                SslMode = MySqlSslMode.Required,
+                Port = 10957
             };
+
 
             var connection = new MySqlConnection(builder.ConnectionString);
             return connection;
@@ -34,70 +46,87 @@ namespace Birth_Certificate_Request.Controllers
 
 
         [HttpGet]
-        public ActionResult GetCertificateData([FromQuery] long BRNumber)
+        public BirthCertificateResponseGlobal GetCertificateData([FromQuery] long BRNumber)
         {
 
-            var connection = MysqlDBConnection();
+            
+
+            var data = new BirthCertificateResponseGlobal();
+            data.response = new Response();
+            data.BirthCertificateRes = new BirthCertificateDTO();
 
 
+           
+                var connection = MysqlDBConnection();
 
+                connection.Open();
+                var command = connection.CreateCommand();
+                //command.CommandText = $"SELECT * FROM birthdata WHERE BRNumber = {BRNumber}";
+                command.CommandType = CommandType.StoredProcedure;
+                command.CommandText = "BRCDataGet";
 
-            connection.Open();
-            var command = connection.CreateCommand();
-            //command.CommandText = $"SELECT * FROM birthdata WHERE BRNumber = {BRNumber}";
-            command.CommandType = CommandType.StoredProcedure;
-            command.CommandText = "BRCDataGet";
+                command.Parameters.AddWithValue("@BRN", BRNumber);
 
-            command.Parameters.AddWithValue("@BRNumber", BRNumber);
+            //command.ExecuteNonQuery();
 
-            command.ExecuteNonQuery();
-
-            var reader = command.ExecuteReader();
-
-            //List<BirthCertificateDTO> dataList =new List<BirthCertificateDTO>();
-
-            //BirthCertificateDTO data = new BirthCertificateDTO();
-
-            //var dataList = typeof(BirthCertificateDTO).GetProperties().Select(p=> p.Name).ToList();
-
-
-            string[] data = { };
-
-            while (reader.Read())
-            {
-                //BirthCertificateDTO data = new BirthCertificateDTO();
-
-                int count = reader.FieldCount;
-
-                
-                for(int i = 0; i<count; i++)
+            MySqlDataReader reader = command.ExecuteReader();
+            
+                while (reader.Read())
                 {
-                    var value = reader.GetValue(i);
-                    data.Append(value);
 
-                    //data[i] = value;
-                    
+
+                    data.BirthCertificateRes.RegisterNo = Convert.ToInt16(reader["RegisterNo"].ToString());
+                    data.BirthCertificateRes.DateOfIssue = Convert.ToDateTime(reader["DateOfIssue"].ToString());
+                    data.BirthCertificateRes.DateOfRegistration = Convert.ToDateTime(reader["DateOfRegistration"].ToString());
+                    data.BirthCertificateRes.BRNumber = Convert.ToInt64(reader["BRNumber"].ToString());
+                    data.BirthCertificateRes.Name = reader["Name"].ToString();
+                    data.BirthCertificateRes.DateOfBirth = Convert.ToDateTime(reader["DateOfBirth"].ToString());
+                    data.BirthCertificateRes.PlaceOfBirth = reader["ImageData"].ToString();
+                    data.BirthCertificateRes.PermanentAddress = reader["PermanentAddress"].ToString();
+                    data.BirthCertificateRes.FatherName = reader["FatherName"].ToString();
+                    data.BirthCertificateRes.FatherBRN = Convert.ToInt64(reader["FatherBRN"].ToString());
+                    data.BirthCertificateRes.FatherNIDNumber = Convert.ToInt64(reader["FatherNIDNumber"].ToString());
+                    data.BirthCertificateRes.FatherNationality = reader["FatherNationality"].ToString();
+                    data.BirthCertificateRes.MotherName = reader["MotherName"].ToString();
+                    data.BirthCertificateRes.MotherBRN = Convert.ToInt64(reader["MotherBRN"].ToString());
+                    data.BirthCertificateRes.MotherNIDNumber = Convert.ToInt64(reader["MotherNIDNumber"].ToString());
+                    data.BirthCertificateRes.MotherNationality = reader["MotherNationality"].ToString();
+
+
+
+                    if (!string.IsNullOrEmpty(data.BirthCertificateRes.Name))
+                    {
+                        data.response.StatusCode = 200;
+                        data.response.ResponseMessage = "Success";
+                    }
+                    else
+                    {
+                        data.response.StatusCode = 404;
+                        data.response.ResponseMessage = "Data Not't Found";
+                    }
+
+
                 }
-
-            }
-
-            connection.Close();
+            
 
 
-            return Ok(data);
+                connection.Close();
+
+
+            return data;
 
         }
 
         [HttpPost]
-        public async void PostBirthCertificate([FromBody] BirthCertificate data)
+        public Response PostBirthCertificate([FromBody] BirthCertificate data)
         {
 
-           
+           Response response = new Response();
 
 
             var connection = MysqlDBConnection();
 
-            await connection.OpenAsync();
+            connection.Open();
 
 
 
@@ -166,12 +195,23 @@ namespace Birth_Certificate_Request.Controllers
 
 
 
-            int result = await command.ExecuteNonQueryAsync();
+            int result = command.ExecuteNonQuery();
 
             Console.WriteLine(result);
 
+            if(result != 0)
+            {
+                response.StatusCode = 201;
+                response.ResponseMessage = "Data insert Successfuly";
+            }
+            else
+            {
+                response.StatusCode = 406;
+                response.ResponseMessage = "There is an error";
+            }
 
-            await connection.CloseAsync();
+
+            connection.Close();
 
             if (Base64.IsValid(data.ImageData))
             {
@@ -179,6 +219,8 @@ namespace Birth_Certificate_Request.Controllers
 
                 Console.WriteLine("image data Base64");
             }
+
+            return response;
 
 
         }
